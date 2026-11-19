@@ -71,6 +71,18 @@ def test_private_http_deny_rules_are_separate_from_inline_acl_rules():
     assert network[("aws_subnet", "private")]["map_public_ip_on_launch"] is False
 
 
+def test_provider_is_locked_and_ci_does_not_authenticate_or_deploy_to_aws():
+    lock = load(".terraform.lock.hcl")
+    provider = lock["provider"][0]["registry.terraform.io/hashicorp/aws"]
+    assert provider["version"].startswith("6.") and provider["constraints"] == "~> 6.0"
+    assert any(value.startswith("h1:") for value in provider["hashes"])
+    assert any(value.startswith("zh:") for value in provider["hashes"])
+    workflow = (ROOT.parents[1] / ".github" / "workflows" / "ci.yml").read_text()
+    assert "terraform init -backend=false -input=false -lockfile=readonly" in workflow
+    assert "terraform apply" not in workflow and "configure-aws-credentials" not in workflow
+    assert "id-token: write" not in workflow
+
+
 def test_staging_disabled_by_default_and_database_is_private_encrypted_backed_up():
     variables = {
         name: value for item in load("versions.tf")["variable"] for name, value in item.items()

@@ -33,7 +33,7 @@ operationally complete. No workflow deploys paid AWS resources automatically.
 ### Not delivered yet
 
 The AWS deployment/drills required to close Phase 2 are **not verified**. All six checks passed in
-[CI for implementation commit `0c781ea`](https://github.com/ssambit635-svg/Uptime-X/actions/runs/44585023061),
+[pre-AWS CI](https://github.com/ssambit635-svg/Uptime-X/actions/runs/44590147987),
 including provider-aware Terraform initialization/validation and the Docker Compose build/startup
 smoke test. An account-specific plan, image scan/publication and live AWS drills remain open;
 validation and mocked SDK tests do not prove a cloud deployment.
@@ -168,9 +168,12 @@ controlled HTTP response, persists it through the job pipeline and reads it in t
 claim public egress, real TLS against AWS or geographic execution. Preview-session regressions also
 exercise built-frontend cookie-blocked iframe and storage-denied journeys.
 
-CI runs both database suites, migration upgrade/drift/downgrade checks, lint/build/tests, browser
-journeys, container smoke tests and Terraform validation. Actual live AWS evidence is a separate gate;
-see [the checklist](docs/operations.md#live-aws-acceptance-gate).
+CI runs both database suites, populated migration upgrade/backfill/drift/rollback/cascade checks,
+lint/build/tests, browser journeys, container smoke tests and Terraform validation with a committed
+provider lock. The destructive migration smoke helper (`tests/support/migration_roundtrip.py`) refuses
+existing application tables and requires `APP_ENV=test` plus an empty disposable `*_test` PostgreSQL
+database or `*_test.db` SQLite file; never use it on application data. Actual live AWS evidence is a
+separate gate; see [the checklist](docs/operations.md#live-aws-acceptance-gate).
 
 ## API
 

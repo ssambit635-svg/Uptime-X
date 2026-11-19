@@ -108,16 +108,9 @@ jobs:
         with:
           terraform_version: "1.10.5"
       - run: terraform fmt -check -recursive
-      - run: terraform init -backend=false -input=false
+      - run: terraform init -backend=false -input=false -lockfile=readonly
       - run: terraform validate -no-color
-      - name: Export public provider lock for review
-        run: |
-          python - <<'PY'
-          import base64
-          from pathlib import Path
-          lock = base64.b64encode(Path('.terraform.lock.hcl').read_bytes()).decode('ascii')
-          print(f'::notice title=Terraform provider dependency lock::{lock}')
-          PY
+      - run: git diff --exit-code -- .terraform.lock.hcl
 
   containers:
     name: Compose smoke test

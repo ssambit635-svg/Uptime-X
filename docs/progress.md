@@ -61,7 +61,9 @@ Phase 3's incident lifecycle, notification delivery, timeline or Incident Detect
 - [x] Offline strict HCL syntax/format checks and infrastructure policy contracts.
 - [x] Provider-aware Terraform `fmt`, `init -backend=false` and `validate` on a GitHub-hosted runner.
 - [x] Actual Docker Compose image build and healthy topology startup; API health and frontend HTTP smoke.
-- [ ] Account-specific Terraform plan/cost/IAM review; review/commit the generated provider lock.
+- [x] Reviewed/committed the runner-generated AWS provider 6.73.0 checksum lock; CI uses read-only initialization.
+- [x] Populated migration backfill/rollback/re-upgrade/cascade verification on SQLite and PostgreSQL in CI.
+- [ ] Account-specific Terraform plan/cost/IAM review.
 - [ ] Scan/publish the actual deployment image and record its immutable digest.
 - [ ] Authorized AWS staging account/runner, approved regions/spend, state backend, HTTPS certificate/DNS.
 - [ ] Actual bootstrap, secret replication, regional DB TLS/egress, ECS and EventBridge deployment.
@@ -76,8 +78,8 @@ permissions were silently introduced to inflate Phase 1/2 completion.
 
 Executed in this workspace for the current implementation:
 
-- **242 backend tests passed on real local PostgreSQL**, including concurrent scheduler/consumer leases.
-- **238 passed + 4 intentional PostgreSQL-only skips on SQLite**, **96.58% backend line coverage**.
+- **243 backend tests passed on real local PostgreSQL**, including concurrent scheduler/consumer leases.
+- **239 passed + 4 intentional PostgreSQL-only skips on SQLite**, **96.71% backend line coverage**.
 - **39 frontend component/client/session tests passed** across 7 files.
 - **8 Chromium E2E journeys passed**, including the new queued check → actual controlled HTTP exchange →
   committed result → chart/history/regional views flow. After viewport/mobile/skip-link assertions were
@@ -90,24 +92,27 @@ Executed in this workspace for the current implementation:
   approximately 289 kB main JS / 88 kB gzip plus 410 kB chart JS / 116 kB gzip, no oversized-chunk warning.
 - npm audit reported **0 known vulnerabilities** at verification time.
 - Both Python hash locks regenerated; a **clean hash-locked dev installation and pip check passed**.
+  Both complete backend suites also passed in that clean locked environment.
 - SQLite and PostgreSQL migration upgrade/drift/0001 downgrade/base downgrade/re-upgrade passed.
 - The bootstrap's real SQL grants were exercised against disposable PostgreSQL: API create/read/delete,
   worker schedule/claim/persist/prune/heartbeat and cascading deletion work with restricted roles.
   Worker identity reads/monitor deletion/schema creation and API evidence mutation were denied.
   The SDK/TLS boundary in that local permission exercise was controlled, not an RDS verification.
-- All 9 Terraform files passed strict HCL syntax/formatting via a WASM HCL formatter; 13 offline
+- All 9 Terraform files passed strict HCL syntax/formatting via a WASM HCL formatter; 14 offline
   infrastructure contracts are included in the backend suite. These local checks alone do not perform
   provider-aware validation; that separate check has now passed in CI below.
 
 ## Remote CI acceptance
 
-Implementation commit **`0c781ea7c790352cd767f1964f6583952c2717ea`** was committed and pushed only to
-`arena/3fb6a7d0-uptime-x`. [Run 44585023061](https://github.com/ssambit635-svg/Uptime-X/actions/runs/44585023061)
-completed successfully with **all six jobs green**:
+Implementation and pre-AWS handoff commit **`d74b77ab9f7c7d2b5c4b1624f58cc456238058cb`** was pushed
+only to `arena/3fb6a7d0-uptime-x`. [Run 44590147987](https://github.com/ssambit635-svg/Uptime-X/actions/runs/44590147987)
+completed successfully with **all six jobs green**, including populated migration checks on both DBs.
+Its Terraform-generated public dependency/checksum metadata was retrieved and reviewed for the
+committed provider lock; CI now enforces read-only initialization and rejects lockfile drift.
 
 | CI job | Verified |
 |---|---|
-| Backend (sqlite) | Clean hash-locked installation, Ruff, full coverage suite, migration upgrade/drift/base rollback/re-upgrade |
+| Backend (sqlite) | Clean hash-locked installation, Ruff, full coverage suite, populated migration backfill/drift/rollback/re-upgrade/FK cascades |
 | Backend (postgres) | Same checks against actual PostgreSQL 16, including concurrent scheduler/consumer tests |
 | Frontend | Clean npm install, lint/format, component tests, type/build checks and dependency audit |
 | Browser journeys | Full Chromium suite against the built application/API, including measured history and preview auth |
