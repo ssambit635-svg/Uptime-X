@@ -1,0 +1,59 @@
+# Development topology only. Not a production AWS deployment.
+x-api-environment: &api-environment
+  APP_ENV: development
+  SESSION_COOKIE_SECURE: "false"
+  EMBEDDED_PREVIEW: "false"
+  DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-uptimex}:${POSTGRES_PASSWORD:-local-development-only}@db:5432/${POSTGRES_DB:-uptimex}
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-uptimex}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-development-only}
+      POSTGRES_DB: ${POSTGRES_DB:-uptimex}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    image: uptimex-api:local
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment: *api-environment
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    image: uptimex-api:local
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment: *api-environment
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "8080:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
