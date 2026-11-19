@@ -1,7 +1,11 @@
 # Monitoring operations and staging deployment
 
-**Status: live AWS acceptance has not run. Do not open the Phase 1/2 PR until the gate below passes.**
-This runbook and the Terraform files are implementation, not evidence that cloud resources exist.
+**Status: pre-AWS implementation PR approved; live AWS acceptance is deferred until after merge.**
+The owner explicitly changed this delivery order on 19 November 2026. This runbook and the Terraform
+files are implementation, not evidence that cloud resources exist. The live gate below still must
+pass before Phase 2 is called operationally complete. No paid resources are deployed by CI.
+
+For the non-technical account/setup sequence, start with [AWS after merge](aws-start-here.md).
 
 ## Operating model
 
@@ -175,7 +179,9 @@ hostname as a substitute for certificate/DNS verification. Never enable embedded
 Inspect both worker services' task definitions, running task ARNs/regions, secret injection, private
 networking, logs and own-container probes. Verify actual EventBridge invocations and scheduler
 heartbeats, not merely a manually invoked scheduler. Run the entire acceptance matrix below before
-calling Phase 2 complete or opening its PR. Record exact image digest and Git commit.
+calling Phase 2 operationally complete. The code PR can precede this deployment under the owner's
+revised approval; it must not claim these drills have already passed. Record exact image digest and
+Git commit.
 
 ## Live AWS acceptance gate
 

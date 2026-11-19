@@ -44,12 +44,8 @@ jobs:
       - run: pip install --require-hashes -r backend/requirements-dev.lock
       - run: ruff check backend tests && ruff format --check backend tests
       - run: pytest --cov=app --cov-report=term-missing --cov-fail-under=90
-      - name: Verify migration upgrade, drift, and rollback
-        run: |
-          alembic upgrade head
-          alembic check
-          alembic downgrade base
-          alembic upgrade head
+      - name: Verify populated migration upgrade, backfill, rollback, and cascades
+        run: PYTHONPATH=backend python tests/support/migration_roundtrip.py
 
   frontend:
     name: Frontend
@@ -114,6 +110,14 @@ jobs:
       - run: terraform fmt -check -recursive
       - run: terraform init -backend=false -input=false
       - run: terraform validate -no-color
+      - name: Export public provider lock for review
+        run: |
+          python - <<'PY'
+          import base64
+          from pathlib import Path
+          lock = base64.b64encode(Path('.terraform.lock.hcl').read_bytes()).decode('ascii')
+          print(f'::notice title=Terraform provider dependency lock::{lock}')
+          PY
 
   containers:
     name: Compose smoke test

@@ -7,23 +7,26 @@ The current request supersedes that percentage: finish the rest of **Phase 1 (Ob
 **Phase 2 (Distributed monitoring)**, following both original PRDs in this repository.
 
 Both `UptimeX_Expanded_PRD_v1.md` and the complete original `.docx` were reviewed; neither was changed.
-The owner explicitly selected **live AWS verification before opening the next PR**. Implementation,
-local tests, SDK stubs, Terraform definitions and a Vercel connection are not substitutes. **No Phase
-1/2 completion PR should be opened until the live gate in [operations](operations.md#live-aws-acceptance-gate)
-passes.** No AWS deployment or paid resource creation has been performed by this work.
+The owner revised the delivery order on 19 November 2026: **finish all pre-AWS code and tests, open
+the implementation PR, then guide account setup/deployment after merge**. This replaces the earlier
+request to hold the PR for live AWS verification. No AWS credentials or spending approval are needed
+for this code-only PR. Local tests, SDK stubs, Terraform validation and a Vercel connection still do
+not establish cloud acceptance. The [live gate](operations.md#live-aws-acceptance-gate) remains required
+before calling Phase 2 operationally complete. No AWS deployment or paid resources have been created.
 
 | Roadmap phase | Current status |
 |---|---|
 | 0 Foundation | Delivered in the earlier merged slice |
-| 1 Observatory | Remaining application features implemented; local feature acceptance verified |
-| 2 Distributed monitoring | Durable/SQS/regional implementation and staging IaC written; cloud acceptance still open |
+| 1 Observatory | Remaining application features implemented; local and CI feature acceptance verified |
+| 2 Distributed monitoring | Durable/SQS/regional implementation and staging IaC validated in CI; cloud acceptance still open |
 | 3 Incident intelligence | Not implemented |
 | 4 Playground | Not implemented |
 | 5 Recovery Lab | Not implemented |
 | 6 Production polish | Not implemented |
 
 After Phases 1 and 2 actually close, **four roadmap phases remain (3–6)**. The open AWS acceptance
-work is unfinished Phase 2 work, not a claim that the whole current request is complete.
+work is deferred Phase 2 deployment work, not a claim that cloud execution has already been verified.
+The current PR is the implementation handoff, with the owner's account work explicitly deferred.
 
 ## Phase 1 implementation
 
@@ -56,12 +59,14 @@ Phase 3's incident lifecycle, notification delivery, timeline or Incident Detect
 - [x] EventBridge minute scheduler/daily retention definitions; deploy disabled by default.
 - [x] Compose scheduler/worker services, expanded CI and deployment/replay/rollback/cleanup documentation.
 - [x] Offline strict HCL syntax/format checks and infrastructure policy contracts.
-- [ ] Provider-aware `terraform init/validate/plan` on an equipped runner; review/commit its provider lock.
-- [ ] Build/scan/publish the actual image; verify complete Compose topology on a Docker-capable runner.
+- [x] Provider-aware Terraform `fmt`, `init -backend=false` and `validate` on a GitHub-hosted runner.
+- [x] Actual Docker Compose image build and healthy topology startup; API health and frontend HTTP smoke.
+- [ ] Account-specific Terraform plan/cost/IAM review; review/commit the generated provider lock.
+- [ ] Scan/publish the actual deployment image and record its immutable digest.
 - [ ] Authorized AWS staging account/runner, approved regions/spend, state backend, HTTPS certificate/DNS.
 - [ ] Actual bootstrap, secret replication, regional DB TLS/egress, ECS and EventBridge deployment.
 - [ ] Real regional measurements, target failure/recovery, duplicate delivery, durable retry and actual
-  SQS DLQ/alarm/replay drills, capped scaling and verified cleanup. **Mandatory before PR.**
+  SQS DLQ/alarm/replay drills, capped scaling and verified cleanup. **Post-merge AWS acceptance.**
 
 The stack is **staging-only**, not a public-production deployment. Single-primary RDS/one NAT per region
 are conscious starting tradeoffs, not a multi-region HA claim. No incident/simulation/lab tables or
@@ -75,7 +80,8 @@ Executed in this workspace for the current implementation:
 - **238 passed + 4 intentional PostgreSQL-only skips on SQLite**, **96.58% backend line coverage**.
 - **39 frontend component/client/session tests passed** across 7 files.
 - **8 Chromium E2E journeys passed**, including the new queued check → actual controlled HTTP exchange →
-  committed result → chart/history/regional views flow, with actual modal keyboard/mobile checks.
+  committed result → chart/history/regional views flow. After viewport/mobile/skip-link assertions were
+  added, that measurement journey passed again; CI subsequently reran the complete browser suite.
 - The controlled HTTP test boundary is test-only and not copied into the image. Its timings are measured,
   not filled-in samples; it does not prove public Internet egress, real geographic execution or AWS TLS.
 - Existing cookie-blocked iframe/storage-denied/sign-in regression journeys still pass against the real
@@ -90,12 +96,28 @@ Executed in this workspace for the current implementation:
   Worker identity reads/monitor deletion/schema creation and API evidence mutation were denied.
   The SDK/TLS boundary in that local permission exercise was controlled, not an RDS verification.
 - All 9 Terraform files passed strict HCL syntax/formatting via a WASM HCL formatter; 13 offline
-  infrastructure contracts are included in the backend suite. **Not provider-aware validation/plan.**
+  infrastructure contracts are included in the backend suite. These local checks alone do not perform
+  provider-aware validation; that separate check has now passed in CI below.
 
-The local workspace lacks Docker/Terraform/AWS CLI and authorized AWS access. Container/provider checks
-are delegated to the CI/equipped-runner steps; cloud drill results remain explicitly unclaimed.
-See the workflow's actual run for remote check results, not this local evidence record. No workflow
-in this repository automatically deploys paid AWS resources.
+## Remote CI acceptance
+
+Implementation commit **`0c781ea7c790352cd767f1964f6583952c2717ea`** was committed and pushed only to
+`arena/3fb6a7d0-uptime-x`. [Run 44585023061](https://github.com/ssambit635-svg/Uptime-X/actions/runs/44585023061)
+completed successfully with **all six jobs green**:
+
+| CI job | Verified |
+|---|---|
+| Backend (sqlite) | Clean hash-locked installation, Ruff, full coverage suite, migration upgrade/drift/base rollback/re-upgrade |
+| Backend (postgres) | Same checks against actual PostgreSQL 16, including concurrent scheduler/consumer tests |
+| Frontend | Clean npm install, lint/format, component tests, type/build checks and dependency audit |
+| Browser journeys | Full Chromium suite against the built application/API, including measured history and preview auth |
+| Compose smoke test | Real Docker image build, complete service startup/health, API/frontend HTTP smoke and volume cleanup |
+| Terraform validation (no deployment) | Terraform 1.10.5 formatting, provider-aware initialization without a backend, schema validation |
+
+The workflow does **not** plan/apply an AWS stack or scan/publish an ECR image. It does not establish
+live regional behavior. The owner has approved opening the pre-AWS implementation PR. Cloud
+deployment/drill results remain explicitly unclaimed; see the [post-merge live gate](operations.md#live-aws-acceptance-gate).
+The local disposable PostgreSQL process was stopped after verification.
 
 ## Remaining roadmap
 

@@ -89,9 +89,13 @@ correlation; an OpenTelemetry collector/exported distributed-trace pipeline is n
 
 Controlled HTTP/security tests, PostgreSQL parallel claims/schedulers, policy fencing, migrations,
 SQS SDK contracts, restricted DB-role exercises, UI tests and browser add → queue → measured history
-cover local acceptance. They do not establish AWS IAM/network/secret replication, Scheduler dispatch,
-regional geography, real broker redrive, autoscaling or successful deployment. All require the
-[separate live acceptance record](../operations.md#live-aws-acceptance-gate) before opening the PR.
+cover local acceptance. [CI for implementation commit `0c781ea`](https://github.com/ssambit635-svg/Uptime-X/actions/runs/44585023061)
+also passed clean dependency installs/full suites, actual Docker Compose build/startup and
+provider-aware Terraform initialization/schema validation. Neither establishes AWS IAM/network/secret
+replication, Scheduler dispatch, regional geography, real broker redrive, autoscaling or successful
+cloud deployment. All require the [separate live acceptance record](../operations.md#live-aws-acceptance-gate)
+before Phase 2 is called operationally complete. The owner approved a pre-AWS code PR and deferred
+account setup/deployment until after merge; that approval changes delivery order, not cloud evidence.
 
 At this scale we deliberately do not add Redis coordination, Kubernetes, per-monitor AWS schedules,
 incident tables, synthetic simulation data, exports or a privileged lab executor. Follow-on production

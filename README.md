@@ -8,8 +8,10 @@ A website observability and resilience-learning platform, built in working verti
 
 Phase 1's real-check workflow is implemented and locally tested. Phase 2's SQS adapter, regional
 workers and staging infrastructure are implemented, but **live AWS acceptance is still pending**.
-This is not a production launch or a claim that an AWS deployment exists. **The Phase 1/2 PR is held
-until deployment, regional checks, retries and DLQ/replay drills have passed in AWS.**
+This is not a production launch or a claim that an AWS deployment exists. **The owner approved a
+pre-AWS implementation PR; account setup, deployment and live drills will follow after merge.**
+Live regional checks, retries and DLQ/replay verification remain required before declaring Phase 2
+operationally complete. No workflow deploys paid AWS resources automatically.
 
 ### Working in the application
 
@@ -30,17 +32,22 @@ until deployment, regional checks, retries and DLQ/replay drills have passed in 
 
 ### Not delivered yet
 
-The AWS deployment/drills required to close Phase 2 are **not verified**. Terraform provider
-validation/plan and container smoke tests must pass on an appropriately equipped runner; syntax
-parsing and mocked SDK tests do not prove a cloud deployment.
+The AWS deployment/drills required to close Phase 2 are **not verified**. All six checks passed in
+[CI for implementation commit `0c781ea`](https://github.com/ssambit635-svg/Uptime-X/actions/runs/44585023061),
+including provider-aware Terraform initialization/validation and the Docker Compose build/startup
+smoke test. An account-specific plan, image scan/publication and live AWS drills remain open;
+validation and mocked SDK tests do not prove a cloud deployment.
 
 Incident lifecycle, customer notifications, Incident Detective, public status pages, Playground,
 Recovery Lab and public-production hardening are not implemented. Configured failure/recovery
 thresholds currently classify monitor state; they do **not** create incidents or alerts.
 
+New to AWS? Start with the [plain-language post-merge guide](docs/aws-start-here.md). No AWS account
+access or spending is needed to review and merge this implementation.
+
 Read [progress and phase boundaries](docs/progress.md), [operations/deployment](docs/operations.md),
 [security](docs/security.md) and [monitoring design](docs/decisions/0003-monitoring-pipeline.md).
-Both original PRDs remain unchanged. After Phases 1 and 2 pass their acceptance gate, **four roadmap
+Both original PRDs remain unchanged. After Phases 1 and 2 close, **four roadmap
 phases remain: 3 Incident intelligence, 4 Playground, 5 Recovery Lab, 6 Production polish.**
 
 ## Local development
