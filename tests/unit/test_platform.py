@@ -11,7 +11,7 @@ def test_health_checks_database_and_reports_capability(client: TestClient):
     response = client.get("/api/v1/health")
     assert response.status_code == 200
     assert response.json()["database"] == "connected"
-    assert response.json()["checks_enabled"] is False
+    assert response.json()["checks_enabled"] is True
     assert response.headers["Cache-Control"] == "no-store"
     assert response.headers["X-Request-ID"]
     assert response.headers["X-Content-Type-Options"] == "nosniff"
@@ -79,7 +79,7 @@ def test_database_failure_makes_health_unavailable(app, client):
     assert result.json()["database"] == "error"
 
 
-def test_unexpected_exceptions_do_not_expose_internal_details(app, client):
+def test_unexpected_exceptions_do_not_expose_internal_details(app, client, caplog):
     @app.get("/api/v1/test-failure")
     def broken():
         raise RuntimeError("internal-sensitive-details")
@@ -88,7 +88,9 @@ def test_unexpected_exceptions_do_not_expose_internal_details(app, client):
     assert result.status_code == 500
     assert result.json()["error"]["code"] == "INTERNAL_ERROR"
     assert "internal-sensitive-details" not in result.text
-    assert result.headers["X-Request-ID"]
+    assert "internal-sensitive-details" not in caplog.text
+    assert "RuntimeError" in caplog.text
+    assert result.headers["X-Request-ID"] in caplog.text
 
 
 def test_interactive_reference_documents_the_write_header(client):

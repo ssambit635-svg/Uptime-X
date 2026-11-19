@@ -28,3 +28,12 @@ test-results/
 .DS_Store
 .idea/
 .vscode/
+
+# Infrastructure state, plans and account-specific inputs
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+*.tfvars.json
+crash.log

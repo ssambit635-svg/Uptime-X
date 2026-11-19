@@ -12,6 +12,18 @@ const monitor: Monitor = {
   target_url: 'https://example.com/',
   interval_seconds: 300,
   timeout_seconds: 10,
+  expected_status_min: 200,
+  expected_status_max: 299,
+  slow_threshold_ms: 2000,
+  failure_threshold: 3,
+  recovery_threshold: 2,
+  regions: ['local'],
+  revision: 1,
+  revision_started_at: '2026-11-19T00:00:00Z',
+  status_reason: 'No trustworthy observation yet.',
+  eligible_checks: 0,
+  regional_status: [],
+
   status: 'UNKNOWN',
   provenance: 'REAL',
   created_at: user.created_at,
@@ -41,9 +53,7 @@ describe('honest dashboard states', () => {
     setup()
     expect(await screen.findByText('A home for your first website.')).toBeInTheDocument()
     expect(screen.queryByText(/99\.9|100%|0%/)).not.toBeInTheDocument()
-    expect(
-      screen.getByText(/Background checks, uptime metrics and alerts are not active yet/),
-    ).toBeInTheDocument()
+    expect(screen.getByText(/Incidents and alerts are not active yet/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Incidents/ })).toBeDisabled()
   })
   it('displays UNKNOWN and unmeasured values for a newly configured monitor', async () => {

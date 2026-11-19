@@ -12,7 +12,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.api import auth, monitors
+from app.api import auth, monitors, operations
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.errors import error_response, install_error_handlers
@@ -37,8 +37,11 @@ def document_client_header(
 def create_app() -> FastAPI:
     app = FastAPI(
         title="UptimeX API",
-        version="0.1.0",
-        description="Phase 1 foundation. Monitor configuration only; checks are not running yet.",
+        version="0.2.0",
+        description=(
+            "Real bounded monitoring, history and distributed workers. "
+            "No incidents or simulations yet."
+        ),
         docs_url="/api/docs",
         redoc_url=None,
         openapi_url="/api/openapi.json",
@@ -77,8 +80,14 @@ def create_app() -> FastAPI:
         if response is None:
             try:
                 response = await call_next(request)
-            except Exception:
-                logger.exception("Unhandled API error; request_id=%s", request_id)
+            except Exception as exc:
+                # Exception strings/tracebacks can contain SQL parameters, DSNs
+                # or secret-bearing target URLs. Correlate by ID/type only.
+                logger.error(
+                    "Unhandled API error; request_id=%s error_type=%s",
+                    request_id,
+                    type(exc).__name__,
+                )
                 response = error_response(
                     500, "INTERNAL_ERROR", "Something went wrong. Please try again."
                 )
@@ -111,13 +120,14 @@ def create_app() -> FastAPI:
             content={
                 "status": "ok",
                 "database": "connected",
-                "version": "0.1.0",
-                "checks_enabled": False,
+                "version": "0.2.0",
+                "checks_enabled": get_settings().monitoring_enabled,
             }
         )
 
     app.include_router(auth.router, prefix="/api/v1")
     app.include_router(monitors.router, prefix="/api/v1")
+    app.include_router(operations.router, prefix="/api/v1")
     frontend_dist = get_settings().frontend_dist
     if frontend_dist is not None:
         directory = frontend_dist.resolve()

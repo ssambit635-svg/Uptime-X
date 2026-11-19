@@ -17,13 +17,24 @@ export interface Monitor {
   target_url: string
   interval_seconds: number
   timeout_seconds: number
-  status: 'UNKNOWN' | 'PAUSED'
+  status: 'UP' | 'DEGRADED' | 'DOWN' | 'UNKNOWN' | 'PAUSED'
   provenance: 'REAL'
   created_at: string
   updated_at: string
-  last_checked_at: null
-  availability_percent: null
-  response_time_ms: null
+  expected_status_min: number
+  expected_status_max: number
+  slow_threshold_ms: number
+  failure_threshold: number
+  recovery_threshold: number
+  regions: string[]
+  revision: number
+  revision_started_at: string
+  status_reason: string
+  eligible_checks: number
+  regional_status: RegionalStatus[]
+  last_checked_at: string | null
+  availability_percent: number | null
+  response_time_ms: number | null
 }
 
 export interface MonitorInput {
@@ -31,13 +42,92 @@ export interface MonitorInput {
   target_url: string
   interval_seconds: number
   timeout_seconds: number
+  expected_status_min: number
+  expected_status_max: number
+  slow_threshold_ms: number
+  failure_threshold: number
+  recovery_threshold: number
+  regions?: string[]
+}
+
+export interface RegionalStatus {
+  region: string
+  status: Monitor['status']
+  reason: string
+  last_checked_at: string | null
+  response_time_ms: number | null
+}
+
+export interface Check {
+  id: string
+  job_id: string
+  revision: number
+  region: string
+  scheduled_at: string
+  started_at: string
+  checked_at: string
+  outcome: 'UP' | 'DEGRADED' | 'FAILURE' | 'UNKNOWN'
+  http_status: number | null
+  dns_ms: number | null
+  connect_ms: number | null
+  tls_ms: number | null
+  ttfb_ms: number | null
+  total_ms: number
+  response_bytes: number
+  redirect_count: number
+  error_category: string | null
+  provenance: 'REAL'
+}
+
+export interface CheckList {
+  items: Check[]
+  total: number
+  limit: number
+  offset: number
+}
+export interface SampleStats {
+  samples: number
+  eligible_checks: number
+  successful_checks: number
+  failed_checks: number
+  inconclusive_checks: number
+  availability_percent: number | null
+  latency_samples: number
+  average_ms: number | null
+  median_ms: number | null
+  p95_ms: number | null
+}
+export type AnalyticsWindow = '24h' | '7d' | '30d' | '90d'
+export interface Analytics extends SampleStats {
+  window: AnalyticsWindow
+  start: string
+  end: string
+  eligible_since: string
+  revision: number
+  expected_slots: number
+  observed_slots: number
+  coverage_percent: number
+  estimated_downtime_seconds: number
+  policy: string
+  regions: (SampleStats & { region: string })[]
+  trend: (SampleStats & { start: string; end: string })[]
+  provenance: 'REAL'
+}
+export interface Operations {
+  checks_enabled: boolean
+  queue_transport: 'database' | 'sqs'
+  configured_regions: string[]
+  retention_days: number
+  scheduler: { last_seen_at: string | null; healthy: boolean }
+  regions: { region: string; healthy_workers: number; last_seen_at: string | null }[]
+  jobs: { pending: number; dead: number; oldest_pending_seconds: number | null }
 }
 
 export interface MonitorList {
   items: Monitor[]
   total: number
   quota: number
-  checks_enabled: false
+  checks_enabled: boolean
 }
 
 export class ApiError extends Error {
@@ -123,6 +213,18 @@ export const api = {
     clearPreviewSession()
   },
   monitors: () => request<MonitorList>('/monitors?limit=100'),
+  monitor: (id: string) => request<Monitor>(`/monitors/${id}`),
+  checks: (id: string, offset = 0, region = '') =>
+    request<CheckList>(
+      `/monitors/${id}/checks?limit=50&offset=${offset}${region ? `&region=${encodeURIComponent(region)}` : ''}`,
+    ),
+  analytics: (id: string, window: AnalyticsWindow = '24h', region = '') =>
+    request<Analytics>(
+      `/monitors/${id}/analytics?window=${window}${region ? `&region=${encodeURIComponent(region)}` : ''}`,
+    ),
+  checkNow: (id: string) =>
+    request<{ job_ids: string[]; state: string }>(`/monitors/${id}/check`, { method: 'POST' }),
+  operations: () => request<Operations>('/operations'),
   createMonitor: (data: MonitorInput) =>
     request<Monitor>('/monitors', { method: 'POST', body: JSON.stringify(data) }),
   updateMonitor: (id: string, data: MonitorInput) =>
@@ -130,7 +232,7 @@ export const api = {
   setPaused: (id: string, paused: boolean) =>
     request<Monitor>(`/monitors/${id}/${paused ? 'pause' : 'resume'}`, { method: 'POST' }),
   deleteMonitor: (id: string) => request<void>(`/monitors/${id}`, { method: 'DELETE' }),
-  health: () => request<{ status: string; database: string; checks_enabled: false }>('/health'),
+  health: () => request<{ status: string; database: string; checks_enabled: boolean }>('/health'),
 }
 
 export function errorMessage(error: unknown): string {

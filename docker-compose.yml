@@ -3,6 +3,10 @@ x-api-environment: &api-environment
   APP_ENV: development
   SESSION_COOKIE_SECURE: "false"
   EMBEDDED_PREVIEW: "false"
+  MONITORING_ENABLED: "true"
+  QUEUE_BACKEND: database
+  MONITOR_REGIONS: '["local"]'
+  WORKER_REGION: local
   DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-uptimex}:${POSTGRES_PASSWORD:-local-development-only}@db:5432/${POSTGRES_DB:-uptimex}
 
 services:
@@ -44,6 +48,35 @@ services:
         condition: service_completed_successfully
       db:
         condition: service_healthy
+
+  scheduler:
+    image: uptimex-api:local
+    environment: *api-environment
+    command: ["python", "-m", "app.workers.cli", "scheduler", "--loop"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-m", "app.workers.cli", "health", "--role", "scheduler"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+
+  worker:
+    image: uptimex-api:local
+    environment: *api-environment
+    command: ["python", "-m", "app.workers.cli", "worker", "--loop"]
+    stop_grace_period: 30s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-m", "app.workers.cli", "health", "--role", "worker"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
 
   web:
     build:

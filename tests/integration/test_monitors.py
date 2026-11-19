@@ -36,7 +36,7 @@ def test_create_never_invents_measurements(authed: TestClient):
     listing = authed.get(BASE).json()
     assert listing["total"] == 1
     assert listing["quota"] == 10
-    assert listing["checks_enabled"] is False
+    assert listing["checks_enabled"] is True
     assert listing["items"][0] == data
 
 
