@@ -1,0 +1,30 @@
+# Secrets and local state
+.env
+.env.*
+!.env.example
+.local/
+.cache/
+.venv/
+*.db
+*.db-shm
+*.db-wal
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+*.egg-info/
+# JavaScript / generated output
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
