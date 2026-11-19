@@ -44,12 +44,8 @@ jobs:
       - run: pip install --require-hashes -r backend/requirements-dev.lock
       - run: ruff check backend tests && ruff format --check backend tests
       - run: pytest --cov=app --cov-report=term-missing --cov-fail-under=90
-      - name: Verify migration upgrade, drift, and rollback
-        run: |
-          alembic upgrade head
-          alembic check
-          alembic downgrade base
-          alembic upgrade head
+      - name: Verify populated migration upgrade, backfill, rollback, and cascades
+        run: PYTHONPATH=backend python tests/support/migration_roundtrip.py
 
   frontend:
     name: Frontend
@@ -99,6 +95,22 @@ jobs:
           name: browser-failure-details
           path: frontend/test-results/
           retention-days: 5
+
+  infrastructure:
+    name: Terraform validation (no deployment)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infrastructure/terraform
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.10.5"
+      - run: terraform fmt -check -recursive
+      - run: terraform init -backend=false -input=false -lockfile=readonly
+      - run: terraform validate -no-color
+      - run: git diff --exit-code -- .terraform.lock.hcl
 
   containers:
     name: Compose smoke test

@@ -3118,3 +3118,334 @@ tbody tr:hover {
   width: 100%;
   font-size: 11px;
 }
+
+/* Real measurements: null gaps are deliberately not drawn as zero or success. */
+.monitor-status.up {
+  color: #74efd0;
+  border-color: #389f8177;
+  background: #15574430;
+}
+.monitor-status.up .status-dot {
+  background: #74efd0;
+}
+.monitor-status.down {
+  color: #ffb2b5;
+  border-color: #c45d6877;
+  background: #8c263330;
+}
+.monitor-status.down .status-dot {
+  background: #ff969e;
+}
+.monitor-status.degraded {
+  color: #f6d08b;
+  border-color: #b8954277;
+  background: #70501a30;
+}
+.measurement-link {
+  padding: 0;
+  background: none;
+  border: 0;
+  color: #a1eadb;
+  font-weight: 600;
+  font-size: inherit;
+  text-align: left;
+}
+.measurement-link:hover {
+  text-decoration: underline;
+}
+.measurement-modal {
+  width: min(1080px, calc(100% - 28px));
+}
+.measurement-body {
+  padding: 24px;
+  min-width: 0;
+}
+.measurement-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+.measurement-heading .real-badge {
+  margin-left: 12px;
+}
+.measurement-heading p {
+  font-size: 13px;
+  color: #c8d5e2;
+  margin: 12px 0 8px;
+}
+.measurement-heading small,
+.measurement-policy {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.8;
+}
+.measurement-controls {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 22px 0;
+}
+.measurement-controls label {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+}
+.measurement-controls select {
+  width: auto;
+  min-width: 120px;
+}
+.measurement-controls .button {
+  margin-left: auto;
+}
+.measurement-stats,
+.pipeline-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0;
+}
+.measurement-stats article,
+.pipeline-summary > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #0f1823;
+}
+.measurement-stats small,
+.pipeline-summary small {
+  font-size: 11px;
+  color: #b0c0d1;
+}
+.measurement-stats strong {
+  font-size: 24px;
+  font-weight: 600;
+}
+.measurement-stats span,
+.pipeline-summary span {
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.measurement-policy {
+  border-left: 2px solid #445e76;
+  padding-left: 12px;
+  margin: 20px 0;
+}
+.measurement-body h3 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  margin: 24px 0 16px;
+}
+.measurement-body h3 small {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+.measurement-chart {
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 0 18px 14px;
+}
+.no-chart-data {
+  padding: 60px 20px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+.trend-data {
+  font-size: 11px;
+  color: #bcc9d6;
+}
+.trend-data .table-scroll {
+  max-height: 260px;
+  margin-top: 14px;
+}
+.measurement-body .table-scroll,
+.fleet-health .table-scroll {
+  max-width: 100%;
+  position: relative;
+  overflow: auto;
+}
+.measurement-body table,
+.fleet-health table {
+  width: 100%;
+  min-width: 650px;
+  border-collapse: collapse;
+}
+.measurement-body th,
+.fleet-health th {
+  color: #9fb1c5;
+  font-size: 10px;
+  font-weight: 500;
+  text-align: left;
+  white-space: nowrap;
+  padding: 14px 9px;
+  border-bottom: 1px solid var(--border);
+}
+.measurement-body td,
+.fleet-health td {
+  font-size: 11px;
+  line-height: 1.65;
+  padding: 14px 9px;
+  vertical-align: top;
+  border-bottom: 1px solid #26334388;
+}
+.measurement-body summary,
+.policy-fields summary {
+  cursor: pointer;
+  color: #93d8cc;
+  padding: 10px 0;
+}
+.check-history > p {
+  font-size: 13px;
+  color: var(--muted);
+  padding: 20px 0;
+}
+.check-history dl {
+  min-width: 170px;
+  margin-top: 9px;
+}
+.check-history dt {
+  color: var(--muted);
+  font-size: 10px;
+}
+.check-history dd {
+  margin: 0 0 8px;
+}
+.history-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding-top: 18px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.regional-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+  margin: 18px 0;
+}
+.regional-cards article {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+.regional-cards strong {
+  font-size: 13px;
+}
+.regional-cards p {
+  font-size: 12px;
+  color: #b7c7d5;
+  line-height: 1.7;
+  margin: 0;
+}
+.regional-cards small {
+  font-size: 10px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+.fleet-health {
+  min-width: 0;
+  padding: 0 20px 22px;
+}
+.fleet-health .panel-heading {
+  padding-right: 0;
+  padding-left: 0;
+}
+.fleet-health .pipeline-summary {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.pipeline-summary strong {
+  font-size: 16px;
+}
+.fleet-loading {
+  padding: 30px 10px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.region-evidence {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 9px;
+}
+.policy-fields {
+  margin: 12px 0;
+  padding: 5px 13px 14px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  font-size: 12px;
+}
+.policy-fields .form-columns {
+  margin: 12px 0 16px;
+}
+.policy-fields fieldset {
+  margin: 18px 0 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+.policy-fields legend {
+  padding: 0 5px;
+  color: var(--muted);
+}
+.region-choice {
+  justify-content: flex-start;
+  gap: 10px;
+  line-height: 1.6;
+}
+.region-choice input {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  accent-color: #39dfba;
+}
+@media (max-width: 720px) {
+  .measurement-body {
+    padding: 16px;
+  }
+  .measurement-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .measurement-stats article {
+    padding: 12px;
+  }
+  .measurement-stats strong {
+    font-size: 20px;
+  }
+  .fleet-health .pipeline-summary {
+    grid-template-columns: 1fr;
+  }
+  .measurement-controls {
+    gap: 10px;
+  }
+  .measurement-controls .button {
+    margin-left: 0;
+  }
+  .history-pagination {
+    flex-wrap: wrap;
+  }
+  .measurement-chart {
+    padding: 0 8px 12px;
+  }
+  .fleet-health .panel-heading {
+    flex-wrap: wrap;
+    gap: 14px;
+  }
+}

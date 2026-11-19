@@ -1,5 +1,6 @@
 import ipaddress
 import re
+import time
 from urllib.parse import quote, urlsplit, urlunsplit
 
 import dns.exception
@@ -33,13 +34,16 @@ def is_public_ip(value: str) -> bool:
     return not address.ipv4_mapped and not any(address in network for network in BLOCKED_V6)
 
 
-def resolve_public_host(host: str) -> list[str]:
+def resolve_public_host(host: str, lifetime: float = 2.0) -> list[str]:
     """Bounded DNS-only validation; this does not make an HTTP request."""
     addresses: list[str] = []
     resolver = dns.resolver.Resolver()
+    deadline = time.monotonic() + lifetime
     for record_type in ("A", "AAAA"):
         try:
-            answer = resolver.resolve(host, record_type, search=False, lifetime=2.0)
+            answer = resolver.resolve(
+                host, record_type, search=False, lifetime=max(0.001, deadline - time.monotonic())
+            )
             addresses.extend(record.address for record in answer)
         except dns.resolver.NoAnswer:
             continue
@@ -52,11 +56,12 @@ def resolve_public_host(host: str) -> list[str]:
     return addresses
 
 
-def validate_target_url(raw_url: str) -> str:
-    """Canonicalize and validate at configuration time; execution must revalidate later.
+def validate_target_url(raw_url: str, *, resolve_dns: bool = True) -> str:
+    """Canonicalize public HTTP(S) syntax; save-time DNS validation is the default.
 
-    The future worker must independently validate DNS/redirects and pin its actual
-    connection destination. A stored URL is never a permanent SSRF authorization.
+    The checker disables this preliminary DNS lookup, then independently validates
+    every resolution and pins its actual socket to a validated numeric address.
+    Literal addresses are always validated, even when resolve_dns is false.
     """
     if any(ord(char) < 32 or ord(char) == 127 for char in raw_url) or "\\" in raw_url:
         raise UnsafeTarget("Use a URL without control characters or backslashes.")
@@ -100,11 +105,11 @@ def validate_target_url(raw_url: str) -> str:
             or re.fullmatch(r"[0-9.]+", host)
         ):
             raise UnsafeTarget("Use a publicly resolvable hostname, not a local network address.")
-        addresses = resolve_public_host(host)
+        addresses = resolve_public_host(host) if resolve_dns else None
     else:
         host = literal.compressed
         addresses = [host]
-    if not addresses or not all(is_public_ip(address) for address in addresses):
+    if addresses is not None and (not addresses or not all(is_public_ip(a) for a in addresses)):
         raise UnsafeTarget("Private, local, reserved and metadata addresses are not allowed.")
     netloc = f"[{host}]" if ":" in host else host
     if port is not None and port != {"http": 80, "https": 443}[parsed.scheme]:

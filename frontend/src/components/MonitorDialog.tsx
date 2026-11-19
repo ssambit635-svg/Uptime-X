@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { ArrowRight, Globe2, Info, LockKeyhole, ShieldCheck } from 'lucide-react'
 import { api, errorMessage } from '../lib/api'
@@ -16,6 +16,25 @@ export function MonitorDialog({
 }) {
   const [pending, setPending] = useState(false)
   const [error, setError] = useState('')
+  const [regions, setRegions] = useState<string[]>([])
+  const [selected, setSelected] = useState<string[]>(monitor?.regions ?? [])
+  useEffect(() => {
+    let alive = true
+    api
+      .operations()
+      .then((result) => {
+        if (alive) {
+          setRegions(result.configured_regions)
+          if (!monitor) setSelected(result.configured_regions)
+        }
+      })
+      .catch(() => {
+        /* Server defaults are used if capability discovery is unavailable. */
+      })
+    return () => {
+      alive = false
+    }
+  }, [monitor])
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -25,6 +44,16 @@ export function MonitorDialog({
       target_url: String(data.get('target_url')).trim(),
       interval_seconds: Number(data.get('interval_seconds')),
       timeout_seconds: Number(data.get('timeout_seconds')),
+      expected_status_min: Number(data.get('expected_status_min')),
+      expected_status_max: Number(data.get('expected_status_max')),
+      slow_threshold_ms: Number(data.get('slow_threshold_ms')),
+      failure_threshold: Number(data.get('failure_threshold')),
+      recovery_threshold: Number(data.get('recovery_threshold')),
+      ...(selected.length ? { regions: selected } : {}),
+    }
+    if (regions.length && !selected.length) {
+      setError('Choose at least one worker region.')
+      return
     }
     if (!input.name) {
       setError('Give your monitor a name.')
@@ -119,12 +148,108 @@ export function MonitorDialog({
             </select>
           </div>
         </div>
+        <details className="policy-fields">
+          <summary>Response policy & worker regions</summary>
+          <div className="form-columns">
+            <div>
+              <label htmlFor="status-min">Expected HTTP minimum</label>
+              <input
+                id="status-min"
+                name="expected_status_min"
+                type="number"
+                min="100"
+                max="599"
+                required
+                defaultValue={monitor?.expected_status_min ?? 200}
+                disabled={pending}
+              />
+            </div>
+            <div>
+              <label htmlFor="status-max">Expected HTTP maximum</label>
+              <input
+                id="status-max"
+                name="expected_status_max"
+                type="number"
+                min="100"
+                max="599"
+                required
+                defaultValue={monitor?.expected_status_max ?? 299}
+                disabled={pending}
+              />
+            </div>
+          </div>
+          <div className="form-columns">
+            <div>
+              <label htmlFor="slow-ms">Slow response threshold (ms)</label>
+              <input
+                id="slow-ms"
+                name="slow_threshold_ms"
+                type="number"
+                min="100"
+                max="10000"
+                required
+                defaultValue={monitor?.slow_threshold_ms ?? 2000}
+                disabled={pending}
+              />
+            </div>
+            <div>
+              <label htmlFor="fail-threshold">Failures before DOWN</label>
+              <input
+                id="fail-threshold"
+                name="failure_threshold"
+                type="number"
+                min="2"
+                max="10"
+                required
+                defaultValue={monitor?.failure_threshold ?? 3}
+                disabled={pending}
+              />
+            </div>
+          </div>
+          <label htmlFor="recover-threshold">Successes to recover</label>
+          <input
+            id="recover-threshold"
+            name="recovery_threshold"
+            type="number"
+            min="1"
+            max="10"
+            required
+            defaultValue={monitor?.recovery_threshold ?? 2}
+            disabled={pending}
+          />
+          <fieldset>
+            <legend>Worker regions</legend>
+            {regions.length ? (
+              regions.map((region) => (
+                <label className="region-choice" key={region}>
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(region)}
+                    onChange={(event) =>
+                      setSelected(
+                        event.target.checked
+                          ? [...selected, region]
+                          : selected.filter((r) => r !== region),
+                      )
+                    }
+                    disabled={pending}
+                  />
+                  {region === 'local' ? 'Local deployment (not an AWS region)' : region}
+                </label>
+              ))
+            ) : (
+              <small>
+                Using server-configured regions. Region capabilities could not be loaded yet.
+              </small>
+            )}
+          </fieldset>
+        </details>
         <div className="info-box">
           <Info size={17} />
           <p>
-            <strong>Configuration now. Real checks next.</strong>This release saves your monitor.
-            Status stays UNKNOWN until the check engine is connected. No requests are sent to your
-            website yet.
+            <strong>Real checks. No invented uptime.</strong> Public DNS and every
+            connection/redirect are revalidated. Status stays UNKNOWN until a worker records a fresh
+            observation. Missing data is never counted as success.
           </p>
         </div>
         {error && (

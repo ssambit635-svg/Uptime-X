@@ -92,8 +92,8 @@ export function AuthScreen({ onAuthenticated }: { onAuthenticated: (user: User) 
             </span>
           </div>
           <div className="honesty-note">
-            <span className="status-dot amber" /> Foundation release. Real health checks are coming
-            next.
+            <span className="status-dot amber" /> Bounded real monitoring. Unknown data is never
+            assumed healthy.
           </div>
         </section>
         <section className="auth-card" aria-labelledby="auth-title">

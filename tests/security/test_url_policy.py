@@ -100,7 +100,8 @@ def test_dns_validation_has_bounded_resolution(monkeypatch):
     monkeypatch.setattr(dns.resolver.Resolver, "resolve", resolve)
     assert url_policy.resolve_public_host("example.com") == ["8.8.8.8", "2606:4700::1111"]
     assert [call[1] for call in calls] == ["A", "AAAA"]
-    assert all(call[2] == {"search": False, "lifetime": 2.0} for call in calls)
+    assert all(call[2]["search"] is False and 0 < call[2]["lifetime"] <= 2 for call in calls)
+    assert calls[1][2]["lifetime"] <= calls[0][2]["lifetime"]
 
 
 @pytest.mark.parametrize("error", [dns.resolver.NXDOMAIN, dns.exception.Timeout, OSError])

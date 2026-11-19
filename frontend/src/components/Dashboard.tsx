@@ -38,12 +38,16 @@ import type { Monitor, MonitorList, User } from '../lib/api'
 import { Brand } from './Brand'
 import { Modal } from './Modal'
 import { MonitorDialog } from './MonitorDialog'
+import { MonitorDetails } from './MonitorDetails'
+import { ms, percent, timestamp } from '../lib/format'
+import { FleetHealth } from './FleetHealth'
 
-type Page = 'overview' | 'websites'
+type Page = 'overview' | 'websites' | 'global' | 'analytics'
 type Filter = 'all' | 'awaiting' | 'paused'
 
 function currentPage(): Page {
-  return window.location.hash === '#websites' ? 'websites' : 'overview'
+  const value = window.location.hash.slice(1)
+  return ['websites', 'global', 'analytics'].includes(value) ? (value as Page) : 'overview'
 }
 function displayUrl(value: string) {
   const url = new URL(value)
@@ -62,6 +66,7 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => void
   const [search, setSearch] = useState('')
   const [dialog, setDialog] = useState<'add' | 'guide' | 'settings' | null>(null)
   const [editing, setEditing] = useState<Monitor | undefined>()
+  const [measuring, setMeasuring] = useState<Monitor | null>(null)
   const [deleting, setDeleting] = useState<Monitor | null>(null)
   const [actionError, setActionError] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -93,7 +98,19 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => void
       setMobileOpen(false)
     }
     window.addEventListener('hashchange', handleHash)
+    const poll = setInterval(() => {
+      if (!document.hidden)
+        api
+          .monitors()
+          .then((result) => {
+            if (alive) setData(result)
+          })
+          .catch((err: unknown) => {
+            if (alive) setError(errorMessage(err))
+          })
+    }, 15_000)
     return () => {
+      clearInterval(poll)
       alive = false
       window.removeEventListener('hashchange', handleHash)
     }
@@ -231,6 +248,22 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => void
     setDialog('add')
   }
   const initial = user.email[0].toUpperCase()
+  const title = {
+    overview: 'Overview',
+    websites: 'Websites',
+    global: 'Global monitor',
+    analytics: 'Analytics',
+  }[page]
+  const healthy = monitors.filter((item) => item.status === 'UP').length
+  function updateMeasurement(item: Monitor) {
+    setData(
+      (previous) =>
+        previous && {
+          ...previous,
+          items: previous.items.map((m) => (m.id === item.id ? item : m)),
+        },
+    )
+  }
 
   return (
     <div className="app-shell">
@@ -292,18 +325,26 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => void
             <Globe2 size={18} />
             Websites<span className="nav-count">{data?.total ?? '—'}</span>
           </a>
-          <button disabled title="Regional workers are planned for a later slice">
+          <a
+            href="#global"
+            className={page === 'global' ? 'active' : ''}
+            aria-current={page === 'global' ? 'page' : undefined}
+          >
             <Radar size={18} />
-            Global monitor<span className="soon-label">SOON</span>
-          </button>
+            Global monitor
+          </a>
           <button disabled title="Incident detection follows the real check engine">
             <TriangleAlert size={18} />
             Incidents<span className="soon-label">SOON</span>
           </button>
-          <button disabled title="Analytics requires real observations">
+          <a
+            href="#analytics"
+            className={page === 'analytics' ? 'active' : ''}
+            aria-current={page === 'analytics' ? 'page' : undefined}
+          >
             <Activity size={18} />
-            Analytics<span className="soon-label">SOON</span>
-          </button>
+            Analytics
+          </a>
         </nav>
         <div className="nav-section-label learn-label">LEARN & EXPERIMENT</div>
         <nav className="main-nav learning-nav" aria-label="Learning tools">
@@ -367,7 +408,7 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => void
             </button>
             <span>Workspace</span>
             <ChevronRight size={13} />
-            <strong>{page === 'overview' ? 'Overview' : 'Websites'}</strong>
+            <strong>{title}</strong>
           </div>
           <div className="topbar-right">
             <span className={`connection-indicator ${apiConnected ? 'connected' : ''}`}>
@@ -397,7 +438,7 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => void
             <div>
               <div className="eyebrow page-eyebrow">YOUR RELIABILITY WORKSPACE</div>
               <h1>
-                {page === 'overview' ? 'Overview' : 'Websites'}
+                {title}
                 <span className="real-badge">
                   <span /> REAL
                 </span>
@@ -431,8 +472,9 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => void
           <div className="release-notice">
             <Info size={15} />
             <p>
-              <strong>A strong foundation comes first.</strong> You can manage monitors today.
-              Background checks, uptime metrics and alerts are not active yet.
+              <strong>Real monitoring. Evidence first.</strong> Checks and charts appear only after
+              workers report. Missing or stale observations stay UNKNOWN. Incidents and alerts are
+              not active yet.
             </p>
             <button onClick={() => setDialog('guide')}>
               What’s included <ArrowUpRight size={13} />
@@ -461,7 +503,7 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => void
                   </h2>
                   <p>
                     {monitors.length
-                      ? 'Your websites are saved. Next, we’ll connect the engine that turns real checks into useful signals.'
+                      ? 'Your websites are saved. View measured checks, timing breakdowns and regional coverage—never assumed uptime.'
                       : 'Bring your websites together. Build a clearer picture of their health, one honest signal at a time.'}
                   </p>
                   <button onClick={() => setDialog('guide')} className="welcome-link">
@@ -512,311 +554,346 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => void
                   tone="slate"
                 />
                 <Stat
-                  label="Default check interval"
-                  value="5"
-                  unit="min"
+                  label="Healthy websites"
+                  value={data ? String(healthy).padStart(2, '0') : '—'}
                   icon={<SlidersHorizontal size={17} />}
-                  hint="Configurable per website"
+                  hint="All configured regions have fresh evidence"
                   tone="violet"
                 />
               </section>
             </>
           )}
-          <div className={`dashboard-grid ${page === 'websites' ? 'websites-layout' : ''}`}>
-            <section className="panel monitor-panel" aria-labelledby="websites-title">
-              <div className="panel-heading">
-                <div>
-                  <h2 id="websites-title">
-                    Your websites <span className="count-badge">{data?.total ?? '—'}</span>
-                  </h2>
-                  <p>Real endpoints. No assumptions.</p>
+          {(page === 'overview' || page === 'websites') && (
+            <div className={`dashboard-grid ${page === 'websites' ? 'websites-layout' : ''}`}>
+              <section className="panel monitor-panel" aria-labelledby="websites-title">
+                <div className="panel-heading">
+                  <div>
+                    <h2 id="websites-title">
+                      Your websites <span className="count-badge">{data?.total ?? '—'}</span>
+                    </h2>
+                    <p>Real endpoints. No assumptions.</p>
+                  </div>
+                  <span className="panel-meta">
+                    <span className="status-dot" /> OBSERVATIONS
+                  </span>
                 </div>
-                <span className="panel-meta">
-                  <span className="status-dot" /> CONFIGURATION
-                </span>
-              </div>
-              <div className="table-toolbar">
-                <div className="filter-tabs" role="group" aria-label="Filter monitors">
-                  {(['all', 'awaiting', 'paused'] as Filter[]).map((item) => (
-                    <button
-                      key={item}
-                      className={filter === item ? 'selected' : ''}
-                      aria-pressed={filter === item}
-                      onClick={() => setFilter(item)}
-                    >
-                      {item === 'all'
-                        ? 'All websites'
-                        : item === 'awaiting'
-                          ? 'Awaiting'
-                          : 'Paused'}
-                      <span>
-                        {data
-                          ? item === 'all'
-                            ? data.total
-                            : item === 'awaiting'
-                              ? awaiting
-                              : paused
-                          : '—'}
-                      </span>
+                <div className="table-toolbar">
+                  <div className="filter-tabs" role="group" aria-label="Filter monitors">
+                    {(['all', 'awaiting', 'paused'] as Filter[]).map((item) => (
+                      <button
+                        key={item}
+                        className={filter === item ? 'selected' : ''}
+                        aria-pressed={filter === item}
+                        onClick={() => setFilter(item)}
+                      >
+                        {item === 'all'
+                          ? 'All websites'
+                          : item === 'awaiting'
+                            ? 'Awaiting'
+                            : 'Paused'}
+                        <span>
+                          {data
+                            ? item === 'all'
+                              ? data.total
+                              : item === 'awaiting'
+                                ? awaiting
+                                : paused
+                            : '—'}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="search-field">
+                    <Search size={15} />
+                    <input
+                      aria-label="Search websites"
+                      placeholder="Search websites…"
+                      value={search}
+                      onChange={(event) => setSearch(event.target.value)}
+                    />
+                  </div>
+                </div>
+                {loading && !data ? (
+                  <div className="panel-loading" role="status">
+                    <RefreshCw size={22} className="spin" />
+                    <p>Loading your workspace…</p>
+                  </div>
+                ) : !data ? (
+                  <div className="empty-state">
+                    <TriangleAlert size={30} />
+                    <h3>We couldn’t load your websites.</h3>
+                    <p>Your saved configuration hasn’t changed.</p>
+                    <button className="button button-secondary" onClick={refresh}>
+                      Try again
                     </button>
-                  ))}
-                </div>
-                <div className="search-field">
-                  <Search size={15} />
-                  <input
-                    aria-label="Search websites"
-                    placeholder="Search websites…"
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                  />
-                </div>
-              </div>
-              {loading && !data ? (
-                <div className="panel-loading" role="status">
-                  <RefreshCw size={22} className="spin" />
-                  <p>Loading your workspace…</p>
-                </div>
-              ) : !data ? (
-                <div className="empty-state">
-                  <TriangleAlert size={30} />
-                  <h3>We couldn’t load your websites.</h3>
-                  <p>Your saved configuration hasn’t changed.</p>
-                  <button className="button button-secondary" onClick={refresh}>
-                    Try again
-                  </button>
-                </div>
-              ) : monitors.length === 0 ? (
-                <div className="empty-state">
-                  <div className="empty-art" aria-hidden="true">
-                    <span className="empty-orbit" />
-                    <span className="empty-globe">
-                      <Globe2 size={29} strokeWidth={1.4} />
-                    </span>
-                    <span className="empty-plus">
-                      <Plus size={13} />
-                    </span>
-                    <span className="empty-particle one" />
-                    <span className="empty-particle two" />
                   </div>
-                  <h3>A home for your first website.</h3>
-                  <p>
-                    Add a public endpoint to get your workspace ready.
-                    <br />
-                    We’ll keep the configuration. You keep the peace of mind.
-                  </p>
-                  <button className="button button-primary" onClick={addMonitor}>
-                    <Plus size={16} />
-                    Add your first website
-                  </button>
-                  <small>
-                    <ShieldCheck size={12} /> Public HTTP(S) only <span>·</span> No traffic sent yet
-                  </small>
-                </div>
-              ) : filtered.length === 0 ? (
-                <div className="empty-state compact-empty">
-                  <Search size={28} />
-                  <h3>No websites match.</h3>
-                  <p>Try a different search or filter.</p>
-                  <button
-                    className="button button-secondary"
-                    onClick={() => {
-                      setSearch('')
-                      setFilter('all')
-                    }}
-                  >
-                    Clear filters
-                  </button>
-                </div>
-              ) : (
-                <div
-                  className="table-scroll"
-                  tabIndex={0}
-                  role="region"
-                  aria-label="Website monitors"
-                >
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>
-                          WEBSITE <ArrowDown size={10} />
-                        </th>
-                        <th>STATUS</th>
-                        <th>UPTIME</th>
-                        <th>RESPONSE</th>
-                        <th>
-                          <span className="sr-only">Actions</span>
-                          <MoreHorizontal size={16} />
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filtered.map((monitor) => (
-                        <tr key={monitor.id}>
-                          <td>
-                            <div className="website-cell">
-                              <span
-                                className={`website-avatar ${monitor.status === 'PAUSED' ? 'muted-avatar' : ''}`}
-                              >
-                                {monitor.name[0].toUpperCase()}
-                              </span>
-                              <div>
-                                <strong>{monitor.name}</strong>
-                                <a
-                                  href={monitor.target_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                >
-                                  {displayUrl(monitor.target_url)}
-                                  <ArrowUpRight size={11} />
-                                </a>
-                              </div>
-                            </div>
-                          </td>
-                          <td>
-                            <span className={`monitor-status ${monitor.status.toLowerCase()}`}>
-                              <span className="status-dot" />
-                              {monitor.status}
-                            </span>
-                            <small className="cell-subtext">
-                              {monitor.status === 'UNKNOWN' ? 'Awaiting data' : 'On standby'}
-                            </small>
-                          </td>
-                          <td>
-                            <span className="no-measurement">—</span>
-                            <small className="cell-subtext">No check data</small>
-                          </td>
-                          <td>
-                            <span className="no-measurement">—</span>
-                            <small className="cell-subtext">Not measured</small>
-                          </td>
-                          <td>
-                            <div className="row-actions">
-                              <button
-                                className="icon-button"
-                                aria-label={`Edit ${monitor.name}`}
-                                title="Edit monitor"
-                                disabled={busyId !== null}
-                                onClick={() => {
-                                  setEditing(monitor)
-                                  setDialog('add')
-                                }}
-                              >
-                                <Pencil size={14} />
-                              </button>
-                              <button
-                                className="icon-button"
-                                aria-label={`${monitor.status === 'PAUSED' ? 'Resume' : 'Pause'} ${monitor.name}`}
-                                title={monitor.status === 'PAUSED' ? 'Resume' : 'Pause'}
-                                disabled={busyId !== null}
-                                onClick={() => togglePause(monitor)}
-                              >
-                                {monitor.status === 'PAUSED' ? (
-                                  <Play size={14} />
-                                ) : (
-                                  <Pause size={14} />
-                                )}
-                              </button>
-                              <button
-                                className="icon-button danger-hover"
-                                aria-label={`Delete ${monitor.name}`}
-                                title="Delete monitor"
-                                disabled={busyId !== null}
-                                onClick={() => {
-                                  setDeleting(monitor)
-                                  setActionError('')
-                                }}
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-              <div className="table-footer">
-                <span>
-                  <LockIcon /> Only visible to you
-                </span>
-                <span>
-                  {data ? `${data.total} / ${data.quota}` : '—'} monitors{' '}
-                  <span className="footer-dot">·</span> Free workspace
-                </span>
-              </div>
-            </section>
-            <aside className="right-column">
-              <section className="panel setup-panel">
-                <div className="setup-heading">
-                  <span className="setup-icon">
-                    <CheckCheck size={18} />
-                  </span>
-                  <span>{monitors.length ? '2' : '1'} OF 3 STEPS</span>
-                </div>
-                <h2>Make yourself at home.</h2>
-                <p>
-                  A solid setup is the first step
-                  <br />
-                  toward a more reliable website.
-                </p>
-                <div
-                  className="setup-progress"
-                  aria-label={`${monitors.length ? 2 : 1} of 3 setup steps complete`}
-                >
-                  <span />
-                  <span className={monitors.length ? 'filled' : ''} />
-                  <span />
-                </div>
-                <div className="setup-step complete">
-                  <span className="step-marker">
-                    <Check size={12} />
-                  </span>
-                  <div>
-                    <strong>Create a workspace</strong>
-                    <small>Your own corner of UptimeX.</small>
-                  </div>
-                </div>
-                <button
-                  className={`setup-step ${monitors.length ? 'complete' : 'current'}`}
-                  onClick={addMonitor}
-                  disabled={atLimit || !data}
-                >
-                  <span className="step-marker">{monitors.length ? <Check size={12} /> : '2'}</span>
-                  <div>
-                    <strong>Add your first website</strong>
+                ) : monitors.length === 0 ? (
+                  <div className="empty-state">
+                    <div className="empty-art" aria-hidden="true">
+                      <span className="empty-orbit" />
+                      <span className="empty-globe">
+                        <Globe2 size={29} strokeWidth={1.4} />
+                      </span>
+                      <span className="empty-plus">
+                        <Plus size={13} />
+                      </span>
+                      <span className="empty-particle one" />
+                      <span className="empty-particle two" />
+                    </div>
+                    <h3>A home for your first website.</h3>
+                    <p>
+                      Add a public endpoint to get your workspace ready.
+                      <br />
+                      We’ll keep the configuration. You keep the peace of mind.
+                    </p>
+                    <button className="button button-primary" onClick={addMonitor}>
+                      <Plus size={16} />
+                      Add your first website
+                    </button>
                     <small>
-                      {monitors.length
-                        ? 'Configuration safely saved.'
-                        : 'Start with a public endpoint.'}
+                      <ShieldCheck size={12} /> Public HTTP(S) only <span>·</span> Bounded requests
+                      · authorized endpoints only
                     </small>
                   </div>
-                  {!monitors.length && <ArrowUpRight size={15} />}
-                </button>
-                <div className="setup-step pending">
-                  <span className="step-marker">3</span>
-                  <div>
-                    <strong>Collect your first signal</strong>
-                    <small>Check engine · coming next</small>
+                ) : filtered.length === 0 ? (
+                  <div className="empty-state compact-empty">
+                    <Search size={28} />
+                    <h3>No websites match.</h3>
+                    <p>Try a different search or filter.</p>
+                    <button
+                      className="button button-secondary"
+                      onClick={() => {
+                        setSearch('')
+                        setFilter('all')
+                      }}
+                    >
+                      Clear filters
+                    </button>
                   </div>
-                  <LockIcon />
+                ) : (
+                  <div
+                    className="table-scroll"
+                    tabIndex={0}
+                    role="region"
+                    aria-label="Website monitors"
+                  >
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>
+                            WEBSITE <ArrowDown size={10} />
+                          </th>
+                          <th>STATUS</th>
+                          <th>UPTIME</th>
+                          <th>RESPONSE</th>
+                          <th>
+                            <span className="sr-only">Actions</span>
+                            <MoreHorizontal size={16} />
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filtered.map((monitor) => (
+                          <tr key={monitor.id}>
+                            <td>
+                              <div className="website-cell">
+                                <span
+                                  className={`website-avatar ${monitor.status === 'PAUSED' ? 'muted-avatar' : ''}`}
+                                >
+                                  {monitor.name[0].toUpperCase()}
+                                </span>
+                                <div>
+                                  <button
+                                    className="measurement-link"
+                                    aria-label={`View measurements for ${monitor.name}`}
+                                    onClick={() => setMeasuring(monitor)}
+                                  >
+                                    {monitor.name}
+                                  </button>
+                                  <a
+                                    href={monitor.target_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    {displayUrl(monitor.target_url)}
+                                    <ArrowUpRight size={11} />
+                                  </a>
+                                </div>
+                              </div>
+                            </td>
+                            <td>
+                              <span className={`monitor-status ${monitor.status.toLowerCase()}`}>
+                                <span className="status-dot" />
+                                {monitor.status}
+                              </span>
+                              <small className="cell-subtext">
+                                {monitor.status === 'PAUSED'
+                                  ? 'On standby'
+                                  : monitor.last_checked_at
+                                    ? timestamp(monitor.last_checked_at)
+                                    : 'Awaiting data'}
+                              </small>
+                            </td>
+                            <td>
+                              <span className="no-measurement">
+                                {percent(monitor.availability_percent)}
+                              </span>
+                              <small className="cell-subtext">
+                                {monitor.eligible_checks
+                                  ? `${monitor.eligible_checks} samples · 24h`
+                                  : 'No check data'}
+                              </small>
+                            </td>
+                            <td>
+                              <span className="no-measurement">{ms(monitor.response_time_ms)}</span>
+                              <small className="cell-subtext">
+                                {monitor.response_time_ms === null
+                                  ? 'Not measured'
+                                  : 'Latest observed response'}
+                              </small>
+                            </td>
+                            <td>
+                              <div className="row-actions">
+                                <button
+                                  className="icon-button"
+                                  aria-label={`Edit ${monitor.name}`}
+                                  title="Edit monitor"
+                                  disabled={busyId !== null}
+                                  onClick={() => {
+                                    setEditing(monitor)
+                                    setDialog('add')
+                                  }}
+                                >
+                                  <Pencil size={14} />
+                                </button>
+                                <button
+                                  className="icon-button"
+                                  aria-label={`${monitor.status === 'PAUSED' ? 'Resume' : 'Pause'} ${monitor.name}`}
+                                  title={monitor.status === 'PAUSED' ? 'Resume' : 'Pause'}
+                                  disabled={busyId !== null}
+                                  onClick={() => togglePause(monitor)}
+                                >
+                                  {monitor.status === 'PAUSED' ? (
+                                    <Play size={14} />
+                                  ) : (
+                                    <Pause size={14} />
+                                  )}
+                                </button>
+                                <button
+                                  className="icon-button danger-hover"
+                                  aria-label={`Delete ${monitor.name}`}
+                                  title="Delete monitor"
+                                  disabled={busyId !== null}
+                                  onClick={() => {
+                                    setDeleting(monitor)
+                                    setActionError('')
+                                  }}
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                <div className="table-footer">
+                  <span>
+                    <LockIcon /> Only visible to you
+                  </span>
+                  <span>
+                    {data ? `${data.total} / ${data.quota}` : '—'} monitors{' '}
+                    <span className="footer-dot">·</span> Free workspace
+                  </span>
                 </div>
               </section>
-              <section className="honest-card">
-                <span className="honest-icon">
-                  <ShieldCheck size={18} />
-                </span>
-                <h3>Unknown ≠ unhealthy.</h3>
-                <p>
-                  No check data? We say so. A monitor only becomes UP after a real, trustworthy
-                  observation.
-                </p>
-                <button onClick={() => setDialog('guide')}>
-                  Our approach to monitoring <ArrowUpRight size={13} />
-                </button>
-              </section>
-            </aside>
-          </div>
+              <aside className="right-column">
+                <section className="panel setup-panel">
+                  <div className="setup-heading">
+                    <span className="setup-icon">
+                      <CheckCheck size={18} />
+                    </span>
+                    <span>{monitors.length ? '2' : '1'} OF 3 STEPS</span>
+                  </div>
+                  <h2>Make yourself at home.</h2>
+                  <p>
+                    A solid setup is the first step
+                    <br />
+                    toward a more reliable website.
+                  </p>
+                  <div
+                    className="setup-progress"
+                    aria-label={`${monitors.length ? 2 : 1} of 3 setup steps complete`}
+                  >
+                    <span />
+                    <span className={monitors.length ? 'filled' : ''} />
+                    <span />
+                  </div>
+                  <div className="setup-step complete">
+                    <span className="step-marker">
+                      <Check size={12} />
+                    </span>
+                    <div>
+                      <strong>Create a workspace</strong>
+                      <small>Your own corner of UptimeX.</small>
+                    </div>
+                  </div>
+                  <button
+                    className={`setup-step ${monitors.length ? 'complete' : 'current'}`}
+                    onClick={addMonitor}
+                    disabled={atLimit || !data}
+                  >
+                    <span className="step-marker">
+                      {monitors.length ? <Check size={12} /> : '2'}
+                    </span>
+                    <div>
+                      <strong>Add your first website</strong>
+                      <small>
+                        {monitors.length
+                          ? 'Configuration safely saved.'
+                          : 'Start with a public endpoint.'}
+                      </small>
+                    </div>
+                    {!monitors.length && <ArrowUpRight size={15} />}
+                  </button>
+                  <div className="setup-step pending">
+                    <span className="step-marker">3</span>
+                    <div>
+                      <strong>Collect your first signal</strong>
+                      <small>
+                        {monitors.some((m) => m.last_checked_at)
+                          ? 'Real observation received.'
+                          : 'Waiting for a worker observation.'}
+                      </small>
+                    </div>
+                    <LockIcon />
+                  </div>
+                </section>
+                <section className="honest-card">
+                  <span className="honest-icon">
+                    <ShieldCheck size={18} />
+                  </span>
+                  <h3>Unknown ≠ unhealthy.</h3>
+                  <p>
+                    No check data? We say so. A monitor only becomes UP after a real, trustworthy
+                    observation.
+                  </p>
+                  <button onClick={() => setDialog('guide')}>
+                    Our approach to monitoring <ArrowUpRight size={13} />
+                  </button>
+                </section>
+              </aside>
+            </div>
+          )}
+          {(page === 'global' || page === 'analytics') && (
+            <FleetHealth
+              monitors={monitors}
+              onSelect={setMeasuring}
+              analytics={page === 'analytics'}
+            />
+          )}
           {page === 'overview' && (
             <section className="journey-strip" aria-label="Product roadmap">
               <div className="journey-intro">
@@ -863,7 +940,7 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => void
               <span className="footer-divider">/</span> Built for signal. Not noise.
             </span>
             <span>
-              Foundation v0.1 <span className="footer-dot">·</span> All timestamps in UTC
+              Observatory v0.2 <span className="footer-dot">·</span> All timestamps in UTC
             </span>
           </footer>
         </main>
@@ -883,6 +960,13 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => void
           </button>
         </div>
       )}
+      {measuring && (
+        <MonitorDetails
+          monitor={measuring}
+          onClose={() => setMeasuring(null)}
+          onUpdated={updateMeasurement}
+        />
+      )}
       {dialog === 'add' && (
         <MonitorDialog
           monitor={editing}
@@ -901,7 +985,7 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => void
         >
           <div className="guide-body">
             <span className="guide-eyebrow">
-              <span className="status-dot amber" /> PHASE 1 · FOUNDATION SLICE
+              <span className="status-dot amber" /> OBSERVATORY · REAL MEASUREMENTS
             </span>
             <h3>
               Real configuration.
@@ -909,22 +993,24 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => void
               <span>No pretend observations.</span>
             </h3>
             <p>
-              This is the first working slice of UptimeX. Here’s exactly what’s ready—and what
-              isn’t.
+              This release measures authorized public endpoints. Here’s exactly what’s ready—and
+              what isn’t.
             </p>
             <div className="guide-list">
               <div>
                 <Check size={17} />
                 <span>
                   <strong>Available today</strong>Private accounts, saved website monitors, URL
-                  safety checks, editing, pause/resume and deletion.
+                  safety checks, real bounded HTTP checks, timing history, regional evidence and
+                  measured charts.
                 </span>
               </div>
               <div>
                 <Clock3 size={17} />
                 <span>
-                  <strong>Coming in the next slices</strong>Background HTTP checks, measurement
-                  history, real uptime charts, incidents and notifications.
+                  <strong>Coming in the next slices</strong>Incident detection, notifications,
+                  public status pages and production hardening. AWS regional deployment still
+                  requires its live verification gate.
                 </span>
               </div>
               <div>
@@ -938,8 +1024,9 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => void
             <div className="info-box">
               <Info size={17} />
               <p>
-                Saved URLs are checked against public DNS. The future worker must revalidate every
-                connection and redirect before making requests.
+                Workers revalidate DNS on each hop, pin actual public destinations, verify TLS and
+                cap time, redirects and response bytes. No response bodies are stored. Uptime is
+                successful eligible checks divided by eligible checks; coverage is separate.
               </p>
             </div>
             <a className="api-reference" href="/api/docs" target="_blank" rel="noreferrer">
@@ -974,15 +1061,19 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => void
               </div>
               <div>
                 <dt>Session</dt>
-                <dd>Revocable · HttpOnly cookie</dd>
+                <dd>Revocable server-side session</dd>
               </div>
               <div>
                 <dt>Background checks</dt>
-                <dd className="amber-text">Not connected yet</dd>
+                <dd className="amber-text">
+                  {data?.checks_enabled
+                    ? 'Enabled · see Global monitor for heartbeat'
+                    : 'Disabled by operator'}
+                </dd>
               </div>
               <div>
                 <dt>Release</dt>
-                <dd>Foundation v0.1.0</dd>
+                <dd>Observatory v0.2.0</dd>
               </div>
             </dl>
             <p className="settings-note">
@@ -1010,7 +1101,10 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => void
               <strong>{deleting.name}</strong> will be permanently removed from your workspace. This
               cannot be undone.
             </p>
-            <small>No check history exists in this release.</small>
+            <small>
+              All associated check history and queued jobs are permanently removed. Pause instead to
+              retain history.
+            </small>
             {actionError && (
               <div className="form-error" role="alert">
                 {actionError}

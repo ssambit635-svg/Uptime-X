@@ -14,3 +14,10 @@
 **/playwright-report
 *.docx
 .coverage
+
+**/.terraform
+**/*.tfstate
+**/*.tfstate.*
+**/*.tfplan
+**/*.tfvars
+**/*.tfvars.json

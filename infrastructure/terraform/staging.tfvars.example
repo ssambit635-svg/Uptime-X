@@ -1,0 +1,14 @@
+# Copy to an ignored *.tfvars file; never put credentials or secret values here.
+# This provisions PAID resources. Review plan/costs and use a staging AWS account.
+environment = "staging"
+owner = "replace-with-owner-tag"
+primary_region = "ap-south-1"
+secondary_region = "ap-southeast-1"
+certificate_arn = "replace-with-validated-primary-region-ACM-certificate-ARN"
+alert_email = "replace-with-your-operator-email"
+# Account-wide alert, not a hard cap or a promise of actual prices.
+monthly_budget_usd = 100
+max_worker_tasks = 2
+# Initial apply creates disabled services/schedules; initialize DB before enabling.
+enable_services = false
+app_image = ""

@@ -1,4 +1,4 @@
-# Security boundaries for the foundation slice
+# Security boundaries — monitoring implementation / AWS acceptance pending
 
 ## Implemented
 
@@ -48,14 +48,54 @@ headers. Auth responses use `Cache-Control: no-store`; credentials never go in U
 Secrets/local databases/test artifacts are ignored. API errors include stable machine codes and
 request IDs; unexpected failures do not return tracebacks.
 
-## Explicitly not solved by URL setup
+## Execution-time boundary
 
-DNS validation when saving a URL is **not** SSRF-safe HTTP execution. There is no HTTP checker in
-this release. Before one is introduced, the worker must independently revalidate every resolution
-and redirect, validate and pin the actual connection destination, preserve correct Host/SNI and TLS
-verification, cap ports/hops/body/time/concurrency, and be isolated from the control plane/metadata
-network by egress controls. Tests must include rebinding and a public URL redirecting to a private
-address. Never implement the worker as `requests.get(stored_url)` or an unrestricted HTTP client.
+Save-time DNS validation is still **not** a permanent permission to fetch an address. The checker
+revalidates every request/redirect, validates every A/AAAA answer, dials a pinned numeric public IP,
+verifies the peer, and keeps the original Host/TLS SNI and CA/hostname validation. Raw sockets never
+read environment proxy settings or perform a second hostname lookup. There is no production
+allow-private or disable-TLS flag, custom header/body input, cookie forwarding or credentialed URL.
+
+A check has an absolute maximum 10-second budget, at most 3 redirects, bounded headers and a 256 KiB
+body budget (one bounded receive can detect an over-limit response). It does not decompress or store
+response bodies. HTTPS downgrade and redirect-to-private/rebinding are refused. UNKNOWN policy/size
+or worker-network capability errors are not target-downtime evidence. Tests include controlled real
+HTTP, forbidden redirects, rebinding, mixed public/private DNS, peer mismatch, malformed/chunked
+responses, certificate errors and timeout. Test-only routed sockets are not shipped in the image.
+
+Cloud workers use private IPv4 subnets, no inbound rules, restricted HTTP(S)/DB egress ports and NACL
+rules denying private HTTP(S) ranges. Link-local AWS credential/DNS traffic has platform exceptions:
+these controls complement, never replace, socket policy. The staging network/permissions still need
+live verification; source code/static tests do not demonstrate effective AWS isolation.
+
+## Distributed jobs and privileges
+
+Only an authenticated owner's monitor can request work. SQS envelopes are limited to 1 KiB of UTF-8,
+strict schema version, job UUID and configured region: no target URLs or HTTP instructions. Workers
+load current, authorized configuration from the database. Region mismatch/poison/dead deliveries
+are not silently acknowledged. SDK calls have bounded timeouts/retries and ignore configured endpoint
+URL overrides. Task roles supply AWS credentials; no key/secret fields are accepted in API payloads.
+
+Monitor row locks serialize scheduling/configuration changes; token-fenced leases and unique job
+results reject duplicates, expired leases and old-policy completions. Paused/deleted monitors must
+not run. Internal worker errors retry/dead-letter without writing a fabricated target failure.
+Only the operator CLI can deliberately replay DEAD work with explicit confirmation. Replay means a
+fresh current-policy check, not changing history or bulk redriving every DLQ message.
+
+The Terraform staging design separates API, scheduler and regional consumer IAM roles. Normal tasks
+use distinct non-owner database roles; only a one-off private bootstrap task reads the RDS-managed
+master secret and provisions restricted credentials. Secret values never enter Terraform state.
+API cannot write measurement evidence; workers cannot read user/session identities, delete monitors
+or create schema. RDS is private/encrypted and forces TLS; application DSNs use verify-full and the
+RDS CA bundle. These SQL permissions were exercised on local PostgreSQL; AWS IAM/secret replication,
+network TLS, image scans and actual broker redrive remain separate live acceptance requirements.
+
+Raw terminal jobs/results expire after the configured retention (default 90 days); old heartbeats
+after 7 days. Hard monitor deletion cascades jobs/history. No response bodies are stored, but configured
+URLs are persisted for execution: use token-free public health endpoints, not secret query strings.
+Unexpected API/worker errors log an error type/correlation ID, not exception strings, SQL parameters,
+DSNs or raw SDK messages. Infrastructure state/plans/account inputs are ignored and excluded from
+Docker context. See the [operations runbook](operations.md) for destructive rollback and replay.
 
 ## Before any public launch
 
@@ -63,11 +103,12 @@ address. Never implement the worker as `requests.get(stored_url)` or an unrestri
 2. Shared rate limits/concurrency controls and a trusted ingress/proxy design. Current auth limits are
    deliberately in-memory, single-process only. Keep `--no-proxy-headers` until a trusted proxy is configured.
 3. HTTPS termination, secure-cookie review, CSP review and managed production secrets.
-4. Outbound worker isolation plus execution-time SSRF and bounded-request tests.
+4. Live worker egress/isolation review and security testing of the actual deployed topology.
 5. Account/monitor ownership policy enforcement appropriate to an Internet-facing service.
 6. Database backups and verified restoration, retention/deletion policy, operator alerts and cost budgets.
 7. Load, dependency, security and deployment review. Compose is development-only, with local credentials.
 
 The API is not a network scanner, traffic generator, arbitrary-header requester or cloud executor.
-REAL monitor configuration is the only current data domain. SIMULATED and LAB tables/APIs are not
-created prematurely; they must remain separate when implemented.
+REAL configuration and measured observations are the only current product data domain. SIMULATED
+and LAB tables/APIs are not created prematurely; they must remain separate when implemented. The
+current staging stack and application are not a public-production security certification.

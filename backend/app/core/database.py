@@ -38,14 +38,27 @@ def make_engine(url: str) -> Engine:
     if parsed.get_backend_name() == "sqlite":
         if parsed.database and parsed.database != ":memory:":
             Path(parsed.database).parent.mkdir(parents=True, exist_ok=True)
-        engine = create_engine(url, connect_args={"check_same_thread": False, "timeout": 15})
+        engine = create_engine(
+            url, hide_parameters=True, connect_args={"check_same_thread": False, "timeout": 15}
+        )
 
         @event.listens_for(engine, "connect")
         def enable_foreign_keys(connection: object, _: object) -> None:
             connection.execute("PRAGMA foreign_keys=ON")  # type: ignore[attr-defined]
 
         return engine
-    return create_engine(url, pool_pre_ping=True)
+    return create_engine(
+        url,
+        hide_parameters=True,
+        pool_pre_ping=True,
+        pool_timeout=5,
+        pool_size=5,
+        max_overflow=5,
+        connect_args={
+            "connect_timeout": 5,
+            "options": "-c statement_timeout=10000 -c lock_timeout=5000",
+        },
+    )
 
 
 engine = make_engine(get_settings().database_url)
